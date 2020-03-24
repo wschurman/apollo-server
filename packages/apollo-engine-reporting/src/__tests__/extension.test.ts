@@ -1,19 +1,19 @@
-import { makeExecutableSchema, addMockFunctionsToSchema } from "graphql-tools";
+import { makeExecutableSchema, addMockFunctionsToSchema } from 'graphql-tools';
 import {
   GraphQLExtensionStack,
-  enableGraphQLExtensions
-} from "graphql-extensions";
-import { graphql, GraphQLError } from "graphql";
-import { Request } from "node-fetch";
+  enableGraphQLExtensions,
+} from 'graphql-extensions';
+import { graphql, GraphQLError } from 'graphql';
+import { Request } from 'node-fetch';
 import {
   EngineReportingExtension,
   makeTraceDetails,
-  makeHTTPRequestHeaders
-} from "../extension";
-import { Headers } from "apollo-server-env";
-import { InMemoryLRUCache } from "apollo-server-caching";
-import { AddTraceArgs } from "../agent";
-import { Trace } from "apollo-engine-reporting-protobuf";
+  makeHTTPRequestHeaders,
+} from '../extension';
+import { Headers } from 'apollo-server-env';
+import { InMemoryLRUCache } from 'apollo-server-caching';
+import { AddTraceArgs } from '../agent';
+import { Trace } from 'apollo-engine-reporting-protobuf';
 
 const typeDefs = `
   type User {
@@ -62,8 +62,7 @@ const queryReport = `
     }
 `;
 
-
-it("trace construction", async () => {
+it('trace construction', async () => {
   const schema = makeExecutableSchema({ typeDefs });
   addMockFunctionsToSchema({ schema });
   enableGraphQLExtensions(schema);
@@ -77,29 +76,30 @@ it("trace construction", async () => {
   const reportingExtension = new EngineReportingExtension(
     {},
     addTrace,
-    "schema-hash"
+    'schema-hash',
   );
   const stack = new GraphQLExtensionStack([reportingExtension]);
   const requestDidEnd = stack.requestDidStart({
-    request: new Request("http://localhost:123/foo"),
+    request: new Request('http://localhost:123/foo'),
     queryString: query,
     requestContext: {
       request: {
         query,
-        operationName: "q",
+        operationName: 'q',
         extensions: {
-          clientName: "testing suite"
-        }
+          clientName: 'testing suite',
+        },
       },
       context: {},
-      cache: new InMemoryLRUCache()
+      metrics: {},
+      cache: new InMemoryLRUCache(),
     },
-    context: {}
+    context: {},
   });
   await graphql({
     schema,
     source: query,
-    contextValue: { _extensionStack: stack }
+    contextValue: { _extensionStack: stack },
   });
   requestDidEnd();
   // XXX actually write some tests
@@ -109,21 +109,21 @@ it("trace construction", async () => {
  * TESTS FOR sendVariableValues REPORTING OPTION
  */
 const variables: Record<string, any> = {
-  testing: "testing",
-  t2: 2
+  testing: 'testing',
+  t2: 2,
 };
 
-describe("check variableJson output for sendVariableValues null or undefined (default)", () => {
-  it("Case 1: No keys/values in variables to be filtered/not filtered", () => {
+describe('check variableJson output for sendVariableValues null or undefined (default)', () => {
+  it('Case 1: No keys/values in variables to be filtered/not filtered', () => {
     const emptyOutput = new Trace.Details();
     expect(makeTraceDetails({})).toEqual(emptyOutput);
     expect(makeTraceDetails({}, undefined)).toEqual(emptyOutput);
     expect(makeTraceDetails({})).toEqual(emptyOutput);
   });
-  it("Case 2: Filter all variables", () => {
+  it('Case 2: Filter all variables', () => {
     const filteredOutput = new Trace.Details();
     Object.keys(variables).forEach(name => {
-      filteredOutput.variablesJson[name] = "";
+      filteredOutput.variablesJson[name] = '';
     });
     expect(makeTraceDetails(variables)).toEqual(filteredOutput);
     expect(makeTraceDetails(variables)).toEqual(filteredOutput);
@@ -131,8 +131,8 @@ describe("check variableJson output for sendVariableValues null or undefined (de
   });
 });
 
-describe("check variableJson output for sendVariableValues all/none type", () => {
-  it("Case 1: No keys/values in variables to be filtered/not filtered", () => {
+describe('check variableJson output for sendVariableValues all/none type', () => {
+  it('Case 1: No keys/values in variables to be filtered/not filtered', () => {
     const emptyOutput = new Trace.Details();
     expect(makeTraceDetails({}, { all: true })).toEqual(emptyOutput);
     expect(makeTraceDetails({}, { none: true })).toEqual(emptyOutput);
@@ -140,7 +140,7 @@ describe("check variableJson output for sendVariableValues all/none type", () =>
 
   const filteredOutput = new Trace.Details();
   Object.keys(variables).forEach(name => {
-    filteredOutput.variablesJson[name] = "";
+    filteredOutput.variablesJson[name] = '';
   });
 
   const nonFilteredOutput = new Trace.Details();
@@ -148,85 +148,89 @@ describe("check variableJson output for sendVariableValues all/none type", () =>
     nonFilteredOutput.variablesJson[name] = JSON.stringify(variables[name]);
   });
 
-  it("Case 2: Filter all variables", () => {
+  it('Case 2: Filter all variables', () => {
     expect(makeTraceDetails(variables, { none: true })).toEqual(filteredOutput);
   });
 
-  it("Case 3: Do not filter variables", () => {
+  it('Case 3: Do not filter variables', () => {
     expect(makeTraceDetails(variables, { all: true })).toEqual(
-      nonFilteredOutput
+      nonFilteredOutput,
     );
   });
 
-  it("Case 4: Check behavior for invalid inputs", () => {
-    expect(makeTraceDetails(variables,
-      // @ts-ignore Testing untyped usage; only `{ none: true }` is legal.
-      { none: false }
-    )).toEqual(
-      nonFilteredOutput
-    );
+  it('Case 4: Check behavior for invalid inputs', () => {
+    expect(
+      makeTraceDetails(
+        variables,
+        // @ts-ignore Testing untyped usage; only `{ none: true }` is legal.
+        { none: false },
+      ),
+    ).toEqual(nonFilteredOutput);
 
-    expect(makeTraceDetails(variables,
-      // @ts-ignore Testing untyped usage; only `{ all: true }` is legal.
-      { all: false }
-    )).toEqual(filteredOutput);
+    expect(
+      makeTraceDetails(
+        variables,
+        // @ts-ignore Testing untyped usage; only `{ all: true }` is legal.
+        { all: false },
+      ),
+    ).toEqual(filteredOutput);
   });
 });
 
-describe("variableJson output for sendVariableValues exceptNames: Array type", () => {
-  it("array contains some values not in keys", () => {
-    const privateVariablesArray: string[] = ["testing", "notInVariables"];
+describe('variableJson output for sendVariableValues exceptNames: Array type', () => {
+  it('array contains some values not in keys', () => {
+    const privateVariablesArray: string[] = ['testing', 'notInVariables'];
     const expectedVariablesJson = {
-      testing: "",
-      t2: JSON.stringify(2)
+      testing: '',
+      t2: JSON.stringify(2),
     };
     expect(
       makeTraceDetails(variables, { exceptNames: privateVariablesArray })
-        .variablesJson
+        .variablesJson,
     ).toEqual(expectedVariablesJson);
   });
 
-  it("none=true equivalent to exceptNames=[all variables]", () => {
-    const privateVariablesArray: string[] = ["testing", "t2"];
+  it('none=true equivalent to exceptNames=[all variables]', () => {
+    const privateVariablesArray: string[] = ['testing', 't2'];
     expect(makeTraceDetails(variables, { none: true }).variablesJson).toEqual(
       makeTraceDetails(variables, { exceptNames: privateVariablesArray })
-        .variablesJson
+        .variablesJson,
     );
   });
 });
 
-describe("variableJson output for sendVariableValues onlyNames: Array type", () => {
-  it("array contains some values not in keys", () => {
-    const privateVariablesArray: string[] = ["t2", "notInVariables"];
+describe('variableJson output for sendVariableValues onlyNames: Array type', () => {
+  it('array contains some values not in keys', () => {
+    const privateVariablesArray: string[] = ['t2', 'notInVariables'];
     const expectedVariablesJson = {
-      testing: "",
-      t2: JSON.stringify(2)
+      testing: '',
+      t2: JSON.stringify(2),
     };
     expect(
       makeTraceDetails(variables, { onlyNames: privateVariablesArray })
-        .variablesJson
+        .variablesJson,
     ).toEqual(expectedVariablesJson);
   });
 
-  it("all=true equivalent to onlyNames=[all variables]", () => {
-    const privateVariablesArray: string[] = ["testing", "t2"];
+  it('all=true equivalent to onlyNames=[all variables]', () => {
+    const privateVariablesArray: string[] = ['testing', 't2'];
     expect(makeTraceDetails(variables, { all: true }).variablesJson).toEqual(
       makeTraceDetails(variables, { onlyNames: privateVariablesArray })
-        .variablesJson
+        .variablesJson,
     );
   });
 
-  it("none=true equivalent to onlyNames=[]", () => {
+  it('none=true equivalent to onlyNames=[]', () => {
     const privateVariablesArray: string[] = [];
     expect(makeTraceDetails(variables, { none: true }).variablesJson).toEqual(
       makeTraceDetails(variables, { onlyNames: privateVariablesArray })
-        .variablesJson
+        .variablesJson,
     );
   });
 });
 
-describe("variableJson output for sendVariableValues transform: custom function type", () => {
-  it("test custom function that redacts every variable to some value", () => {
+describe('variableJson output for sendVariableValues transform: custom function type', () => {
+  it('test custom function that redacts every variable to some value', () => {
     const modifiedValue = 100;
     const customModifier = (input: {
       variables: Record<string, any>;
@@ -245,7 +249,7 @@ describe("variableJson output for sendVariableValues transform: custom function 
     });
 
     expect(makeTraceDetails(variables, { transform: customModifier })).toEqual(
-      output
+      output,
     );
   });
 
@@ -262,77 +266,77 @@ describe("variableJson output for sendVariableValues transform: custom function 
     });
     // remove the first key, and then add a new key
     delete out[firstKey];
-    out["newkey"] = "blah";
+    out['newkey'] = 'blah';
     return out;
   };
 
-  it("original keys in variables should match the modified keys", () => {
+  it('original keys in variables should match the modified keys', () => {
     expect(
       Object.keys(
-        makeTraceDetails(variables, { transform: modifier }).variablesJson
-      ).sort()
+        makeTraceDetails(variables, { transform: modifier }).variablesJson,
+      ).sort(),
     ).toEqual(origKeys.sort());
   });
 
-  it("expect empty string for keys removed by the custom modifier", () => {
+  it('expect empty string for keys removed by the custom modifier', () => {
     expect(
       makeTraceDetails(variables, { transform: modifier }).variablesJson[
         firstKey
-        ]
-    ).toEqual("");
+      ],
+    ).toEqual('');
   });
 
-  it("expect stringify(null) for values set to null by custom modifier", () => {
+  it('expect stringify(null) for values set to null by custom modifier', () => {
     expect(
       makeTraceDetails(variables, { transform: modifier }).variablesJson[
         secondKey
-        ]
+      ],
     ).toEqual(JSON.stringify(null));
   });
 
   const errorThrowingModifier = (_input: {
     variables: Record<string, any>;
   }): Record<string, any> => {
-    throw new GraphQLError("testing error handling");
+    throw new GraphQLError('testing error handling');
   };
 
-  it("redact all variable values when custom modifier throws an error", () => {
+  it('redact all variable values when custom modifier throws an error', () => {
     const variableJson = makeTraceDetails(variables, {
-      transform: errorThrowingModifier
+      transform: errorThrowingModifier,
     }).variablesJson;
     Object.keys(variableJson).forEach(variableName => {
       expect(variableJson[variableName]).toEqual(
-        JSON.stringify("[PREDICATE_FUNCTION_ERROR]")
+        JSON.stringify('[PREDICATE_FUNCTION_ERROR]'),
       );
     });
     expect(Object.keys(variableJson).sort()).toEqual(
-      Object.keys(variables).sort()
+      Object.keys(variables).sort(),
     );
   });
 });
 
-describe("Catch circular reference error during JSON.stringify", () => {
+describe('Catch circular reference error during JSON.stringify', () => {
   interface SelfCircular {
     self?: SelfCircular;
   }
 
   const circularReference: SelfCircular = {};
-  circularReference["self"] = circularReference;
+  circularReference['self'] = circularReference;
 
   const circularVariables = {
-    bad: circularReference
+    bad: circularReference,
   };
 
   expect(
-    makeTraceDetails(circularVariables, { all: true }).variablesJson["bad"]
-  ).toEqual(JSON.stringify("[Unable to convert value to JSON]"));
+    makeTraceDetails(circularVariables, { all: true }).variablesJson['bad'],
+  ).toEqual(JSON.stringify('[Unable to convert value to JSON]'));
 });
 
 function makeTestHTTP(): Trace.HTTP {
   return new Trace.HTTP({
     method: Trace.HTTP.Method.UNKNOWN,
     host: null,
-    path: null
+    path: null,
   });
 }
 
@@ -340,111 +344,144 @@ function makeTestHTTP(): Trace.HTTP {
  * TESTS FOR THE sendHeaders REPORTING OPTION
  */
 const headers = new Headers();
-headers.append("name", "value");
-headers.append("authorization", "blahblah"); // THIS SHOULD NEVER BE SENT
+headers.append('name', 'value');
+headers.append('authorization', 'blahblah'); // THIS SHOULD NEVER BE SENT
 
-const headersOutput = { name: new Trace.HTTP.Values({ value: ["value"] }) };
+const headersOutput = { name: new Trace.HTTP.Values({ value: ['value'] }) };
 
-describe("tests for the shouldReportQuery reporting option", () => {
-  it("report no traces", async () => {
+describe('tests for the shouldReportQuery reporting option', () => {
+  it('report no traces', async () => {
     const schema = makeExecutableSchema({ typeDefs });
     addMockFunctionsToSchema({ schema });
     enableGraphQLExtensions(schema);
 
     async function addTrace(_args: AddTraceArgs) {
-      throw new Error("Should not add any traces");
+      throw new Error('Should not add any traces');
     }
 
     const reportingExtension = new EngineReportingExtension(
       {
         shouldReportQuery: () => {
           return false;
-        }
+        },
       },
       addTrace,
-      "schema-hash"
+      'schema-hash',
     );
 
     const stack = new GraphQLExtensionStack([reportingExtension]);
     const requestDidEnd = stack.requestDidStart({
-      request: new Request("http://localhost:123/foo"),
+      request: new Request('http://localhost:123/foo'),
       queryString: query,
       requestContext: {
         request: {
           query,
-          operationName: "q",
+          operationName: 'q',
           extensions: {
-            clientName: "testing suite"
-          }
+            clientName: 'testing suite',
+          },
         },
         context: {},
-        cache: new InMemoryLRUCache()
+        cache: new InMemoryLRUCache(),
       },
-      context: {}
+      context: {},
     });
 
     await graphql({
       schema,
       source: query,
-      contextValue: { _extensionStack: stack }
+      contextValue: { _extensionStack: stack },
     });
 
     requestDidEnd();
   });
 
-  it("report traces based on operation name", async () => {
+  it('report traces based on operation name', async () => {
     const schema = makeExecutableSchema({ typeDefs });
     addMockFunctionsToSchema({ schema });
     enableGraphQLExtensions(schema);
 
-    async function addTrace(args: AddTraceArgs) {
-      expect(args.operationName).toEqual("report");
+    let tracesAdded = 0;
+
+    async function addTrace(_args: AddTraceArgs) {
+      tracesAdded += 1;
     }
 
     const reportingExtension = new EngineReportingExtension(
       {
-        shouldReportQuery: (request) => {
-          return request.operationName === 'report'
-        }
+        shouldReportQuery: request => {
+          return request.request.operationName === 'report';
+        },
       },
       addTrace,
-      "schema-hash"
+      'schema-hash',
     );
 
     const stack = new GraphQLExtensionStack([reportingExtension]);
     const requestDidEnd = stack.requestDidStart({
-      request: new Request("http://localhost:123/foo"),
+      request: new Request('http://localhost:123/foo'),
       queryString: queryReport,
       requestContext: {
         request: {
           queryReport,
-          operationName: "report",
+          operationName: 'report',
           extensions: {
-            clientName: "testing suite"
-          }
+            clientName: 'testing suite',
+          },
         },
         context: {},
-        cache: new InMemoryLRUCache()
+        metrics: {},
+        cache: new InMemoryLRUCache(),
       },
-      context: {}
+      context: {},
     });
 
     await graphql({
       schema,
       source: queryReport,
-      contextValue: { _extensionStack: stack }
+      contextValue: { _extensionStack: stack },
     });
 
     requestDidEnd();
+    expect(tracesAdded).toEqual(1);
+
+    const request2DidEnd = stack.requestDidStart({
+      request: new Request('http://localhost:123/foo'),
+      queryString: query,
+      requestContext: {
+        request: {
+          query,
+          operationName: 'q',
+          extensions: {
+            clientName: 'testing suite',
+          },
+        },
+        context: {},
+        metrics: {},
+        cache: new InMemoryLRUCache(),
+      },
+      context: {},
+    });
+
+    await graphql({
+      schema,
+      source: query,
+      contextValue: { _extensionStack: stack },
+    });
+
+    request2DidEnd();
+    expect(tracesAdded).toEqual(1);
   });
 });
 
-describe("tests for the sendHeaders reporting option", () => {
-  it("sendHeaders defaults to hiding all", () => {
+describe('tests for the sendHeaders reporting option', () => {
+  it('sendHeaders defaults to hiding all', () => {
     const http = makeTestHTTP();
-    makeHTTPRequestHeaders(http, headers,
+    makeHTTPRequestHeaders(
+      http,
+      headers,
       // @ts-ignore: `null` is not a valid type; check output on invalid input.
-      null
+      null,
     );
     expect(http.requestHeaders).toEqual({});
     makeHTTPRequestHeaders(http, headers, undefined);
@@ -453,7 +490,7 @@ describe("tests for the sendHeaders reporting option", () => {
     expect(http.requestHeaders).toEqual({});
   });
 
-  it("sendHeaders.all and sendHeaders.none", () => {
+  it('sendHeaders.all and sendHeaders.none', () => {
     const httpSafelist = makeTestHTTP();
     makeHTTPRequestHeaders(httpSafelist, headers, { all: true });
     expect(httpSafelist.requestHeaders).toEqual(headersOutput);
@@ -463,44 +500,48 @@ describe("tests for the sendHeaders reporting option", () => {
     expect(httpBlocklist.requestHeaders).toEqual({});
   });
 
-  it("invalid inputs for sendHeaders.all and sendHeaders.none", () => {
+  it('invalid inputs for sendHeaders.all and sendHeaders.none', () => {
     const httpSafelist = makeTestHTTP();
-    makeHTTPRequestHeaders(httpSafelist, headers,
+    makeHTTPRequestHeaders(
+      httpSafelist,
+      headers,
       // @ts-ignore Testing untyped usage; only `{ none: true }` is legal.
-      { none: false }
+      { none: false },
     );
     expect(httpSafelist.requestHeaders).toEqual(headersOutput);
 
     const httpBlocklist = makeTestHTTP();
-    makeHTTPRequestHeaders(httpBlocklist, headers,
+    makeHTTPRequestHeaders(
+      httpBlocklist,
+      headers,
       // @ts-ignore Testing untyped usage; only `{ all: true }` is legal.
-      { all: false }
+      { all: false },
     );
     expect(httpBlocklist.requestHeaders).toEqual({});
   });
 
-  it("test sendHeaders.exceptNames", () => {
-    const except: String[] = ["name", "notinheaders"];
+  it('test sendHeaders.exceptNames', () => {
+    const except: String[] = ['name', 'notinheaders'];
     const http = makeTestHTTP();
     makeHTTPRequestHeaders(http, headers, { exceptNames: except });
     expect(http.requestHeaders).toEqual({});
   });
 
-  it("test sendHeaders.onlyNames", () => {
+  it('test sendHeaders.onlyNames', () => {
     // headers that should never be sent (such as "authorization") should still be removed if in includeHeaders
-    const include: String[] = ["name", "authorization", "notinheaders"];
+    const include: String[] = ['name', 'authorization', 'notinheaders'];
     const http = makeTestHTTP();
     makeHTTPRequestHeaders(http, headers, { onlyNames: include });
     expect(http.requestHeaders).toEqual(headersOutput);
   });
 
-  it("authorization, cookie, and set-cookie headers should never be sent", () => {
-    headers.append("cookie", "blahblah");
-    headers.append("set-cookie", "blahblah");
+  it('authorization, cookie, and set-cookie headers should never be sent', () => {
+    headers.append('cookie', 'blahblah');
+    headers.append('set-cookie', 'blahblah');
     const http = makeTestHTTP();
     makeHTTPRequestHeaders(http, headers, { all: true });
-    expect(http.requestHeaders["authorization"]).toBe(undefined);
-    expect(http.requestHeaders["cookie"]).toBe(undefined);
-    expect(http.requestHeaders["set-cookie"]).toBe(undefined);
+    expect(http.requestHeaders['authorization']).toBe(undefined);
+    expect(http.requestHeaders['cookie']).toBe(undefined);
+    expect(http.requestHeaders['set-cookie']).toBe(undefined);
   });
 });
