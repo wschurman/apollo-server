@@ -382,6 +382,7 @@ describe('tests for the shouldReportQuery reporting option', () => {
           },
         },
         context: {},
+        metrics: {},
         cache: new InMemoryLRUCache(),
       },
       context: {},

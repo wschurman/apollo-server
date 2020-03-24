@@ -72,9 +72,12 @@ export class EngineReportingExtension<TContext = any>
     >;
   }): EndHandler {
     // If we don't want to report a query we can just return with a empty handler
+    // We set `captureTraces` because that information is used to
     if (!this.shouldReportQuery(o.requestContext)) {
+      o.requestContext.metrics.captureTraces = false;
       return () => {};
     }
+    o.requestContext.metrics.captureTraces = true;
 
     this.treeBuilder.startTiming();
     o.requestContext.metrics.startHrTime = this.treeBuilder.startHrTime;
