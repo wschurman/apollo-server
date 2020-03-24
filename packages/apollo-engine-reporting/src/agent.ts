@@ -118,6 +118,14 @@ export interface EngineReportingOptions<TContext> {
    */
   sendVariableValues?: VariableValueOptions;
   /**
+   * By default Apollo server will report all queries to Graph Manager.
+   * If you would like to disable reporting and tracing for certain queries you can give a function that takes in
+   * graphqlRequestContext. The return value of the function will be used to determine if any stats or tracing information will be collected for the query.
+   * Always returning false will act similar to turning off reporting and no instrumentation will take place.
+   *
+   */
+  shouldReportQuery?: (request: GraphQLRequestContext) => boolean;
+  /**
    * [DEPRECATED] Use sendVariableValues
    * Passing an array into privateVariables is equivalent to passing { exceptNames: array } into
    * sendVariableValues, and passing in `true` or `false` is equivalent to passing { none: true } or

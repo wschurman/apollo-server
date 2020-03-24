@@ -37,6 +37,9 @@ export class EngineReportingExtension<TContext = any>
   private options: EngineReportingOptions<TContext>;
   private addTrace: (args: AddTraceArgs) => Promise<void>;
   private generateClientInfo: GenerateClientInfo<TContext>;
+  private shouldReportQuery: (
+    request: GraphQLRequestContext<TContext>,
+  ) => boolean;
 
   public constructor(
     options: EngineReportingOptions<TContext>,
@@ -49,6 +52,7 @@ export class EngineReportingExtension<TContext = any>
     this.addTrace = addTrace;
     this.generateClientInfo =
       options.generateClientInfo || defaultGenerateClientInfo;
+    this.shouldReportQuery = options.shouldReportQuery || reportAllQueries;
 
     this.treeBuilder = new EngineReportingTreeBuilder({
       rewriteError: options.rewriteError,
@@ -67,6 +71,11 @@ export class EngineReportingExtension<TContext = any>
       'metrics' | 'queryHash'
     >;
   }): EndHandler {
+    // If we don't want to report a query we can just return with a empty handler
+    if (!this.shouldReportQuery(o.requestContext)) {
+      return () => {};
+    }
+
     this.treeBuilder.startTiming();
     o.requestContext.metrics.startHrTime = this.treeBuilder.startHrTime;
 
@@ -201,6 +210,10 @@ export class EngineReportingExtension<TContext = any>
 }
 
 // Helpers for producing traces.
+
+function reportAllQueries() {
+  return true;
+}
 
 function defaultGenerateClientInfo({ request }: GraphQLRequestContext) {
   // Default to using the `apollo-client-x` header fields if present.
