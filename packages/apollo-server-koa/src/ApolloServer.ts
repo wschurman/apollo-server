@@ -20,16 +20,16 @@ import { graphqlKoa } from './koaApollo';
 
 export { GraphQLOptions, GraphQLExtension } from 'apollo-server-core';
 
-export interface GetMiddlewareOptions {
+export interface GetMiddlewareOptions<StateT = any, CustomT = {}> {
   path?: string;
   cors?: corsMiddleware.Options | boolean;
   bodyParserConfig?: bodyParser.Options | boolean;
-  onHealthCheck?: (ctx: Koa.Context) => Promise<any>;
+  onHealthCheck?: (ctx: Koa.ParameterizedContext<StateT, CustomT>) => Promise<any>;
   disableHealthCheck?: boolean;
 }
 
-export interface ServerRegistration extends GetMiddlewareOptions {
-  app: Koa;
+export interface ServerRegistration<StateT = any, CustomT = {}> extends GetMiddlewareOptions {
+  app: Koa<StateT, CustomT>;
 }
 
 const fileUploadMiddleware = (
@@ -57,10 +57,10 @@ const fileUploadMiddleware = (
   }
 };
 
-const middlewareFromPath = (
+const middlewareFromPath = <StateT = any, CustomT = {}>(
   path: string,
-  middleware: compose.Middleware<Koa.Context>,
-) => (ctx: Koa.Context, next: () => Promise<any>) => {
+  middleware: compose.Middleware<Koa.ParameterizedContext<StateT, CustomT>>,
+) => (ctx: Koa.ParameterizedContext<StateT, CustomT>, next: () => Promise<any>) => {
   if (ctx.path === path) {
     return middleware(ctx, next);
   } else {
@@ -68,11 +68,11 @@ const middlewareFromPath = (
   }
 };
 
-export class ApolloServer extends ApolloServerBase {
+export class ApolloServer<StateT = any, CustomT = {}> extends ApolloServerBase {
   // This translates the arguments from the middleware into graphQL options It
   // provides typings for the integration specific behavior, ideally this would
   // be propagated with a generic to the super class
-  async createGraphQLServerOptions(ctx: Koa.Context): Promise<GraphQLOptions> {
+  async createGraphQLServerOptions(ctx: Koa.ParameterizedContext<StateT, CustomT>): Promise<GraphQLOptions> {
     return super.graphQLServerOptions({ ctx });
   }
 
@@ -84,7 +84,7 @@ export class ApolloServer extends ApolloServerBase {
     return true;
   }
 
-  public applyMiddleware({ app, ...rest }: ServerRegistration) {
+  public applyMiddleware({ app, ...rest }: ServerRegistration<StateT, CustomT>) {
     app.use(this.getMiddleware(rest));
   }
 
@@ -98,7 +98,7 @@ export class ApolloServer extends ApolloServerBase {
     bodyParserConfig,
     disableHealthCheck,
     onHealthCheck,
-  }: GetMiddlewareOptions = {}): Middleware {
+  }: GetMiddlewareOptions<StateT, CustomT> = {}): Middleware<StateT, CustomT> {
     if (!path) path = '/graphql';
 
     // Despite the fact that this `applyMiddleware` function is `async` in
@@ -126,7 +126,7 @@ export class ApolloServer extends ApolloServerBase {
       middlewares.push(
         middlewareFromPath(
           '/.well-known/apollo/server-health',
-          (ctx: Koa.Context) => {
+          (ctx: Koa.ParameterizedContext<StateT, CustomT>) => {
             // Response follows https://tools.ietf.org/html/draft-inadarei-api-health-check-01
             ctx.set('Content-Type', 'application/health+json');
 
@@ -171,7 +171,7 @@ export class ApolloServer extends ApolloServerBase {
     }
 
     middlewares.push(
-      middlewareFromPath(path, (ctx: Koa.Context, next: Function) => {
+      middlewareFromPath(path, (ctx: Koa.ParameterizedContext<StateT, CustomT>, next: Function) => {
         if (ctx.request.method === 'OPTIONS') {
           ctx.status = 204;
           ctx.body = '';
